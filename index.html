@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Driver Sales Monitoring</title>
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Sales Monitor" />
+    <link rel="apple-touch-icon" sizes="180x180" href="" id="apple-touch-icon" />
+    <link rel="apple-touch-icon" sizes="152x152" href="" id="apple-touch-icon-152" />
+    <link rel="apple-touch-icon" sizes="167x167" href="" id="apple-touch-icon-167" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              primary: 'hsl(var(--color-primary))',
+              'primary-foreground': 'hsl(var(--color-primary-foreground))',
+              secondary: 'hsl(var(--color-secondary))',
+              'secondary-foreground': 'hsl(var(--color-secondary-foreground))',
+              background: 'hsl(var(--color-background))',
+              foreground: 'hsl(var(--color-foreground))',
+              card: 'hsl(var(--color-card))',
+              'card-foreground': 'hsl(var(--color-card-foreground))',
+              border: 'hsl(var(--color-border))',
+              input: 'hsl(var(--color-input))',
+              accent: 'hsl(var(--color-accent))',
+            }
+          }
+        }
+      }
+    </script>
+    <script type="module" src="https://unpkg.com/heroicons@2.1.1/24/outline/index.js"></script>
+    <script type="module" src="https://unpkg.com/heroicons@2.1.1/24/solid/index.js"></script>
+    <style>
+      :root {
+        /* Default Light Theme */
+        --color-primary: 222.2 47.4% 11.2%;
+        --color-primary-foreground: 210 40% 98%;
+        --color-secondary: 210 40% 96.1%;
+        --color-secondary-foreground: 222.2 47.4% 11.2%;
+        --color-background: 0 0% 100%;
+        --color-foreground: 222.2 84% 4.9%;
+        --color-card: 0 0% 100%;
+        --color-card-foreground: 222.2 84% 4.9%;
+        --color-border: 214.3 31.8% 91.4%;
+        --color-input: 214.3 31.8% 91.4%;
+      }
+      .dark {
+        /* Default Dark Theme */
+        --color-primary: 210 40% 98%;
+        --color-primary-foreground: 222.2 47.4% 11.2%;
+        --color-secondary: 217.2 32.6% 17.5%;
+        --color-secondary-foreground: 210 40% 98%;
+        --color-background: 222.2 84% 4.9%;
+        --color-foreground: 210 40% 98%;
+        --color-card: 222.2 84% 4.9%;
+        --color-card-foreground: 210 40% 98%;
+        --color-border: 217.2 32.6% 17.5%;
+        --color-input: 217.2 32.6% 17.5%;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "recharts": "https://esm.sh/recharts@^3.1.2",
+    "clsx": "https://esm.sh/clsx@^2.1.1",
+    "tailwind-merge": "https://esm.sh/tailwind-merge@^3.3.1",
+    "recharts/": "https://esm.sh/recharts@^3.1.2/",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-background text-foreground">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+      }
+    </script>
+</body>
+</html>
