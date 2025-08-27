@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useData } from '../context/DataContext';
+import { AvatarProfile } from './ui/AvatarProfile';
 
 interface HeaderProps {
     onMenuClick?: () => void;
@@ -33,9 +34,12 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                         </svg>
                     </button>
                 )}
-                <div>
-                    <div className="font-semibold text-sm sm:text-base truncate" title={user?.name}>{user?.name}</div>
-                    <div className="text-xs sm:text-sm text-foreground/70 capitalize">{user?.role}</div>
+                <div className="flex items-center gap-3">
+                    <AvatarProfile name={user?.name || 'User'} size="sm" showInfo={false} />
+                    <div>
+                        <div className="font-semibold text-sm sm:text-base truncate" title={user?.name}>{user?.name}</div>
+                        <div className="text-xs sm:text-sm text-foreground/70 capitalize">{user?.role}</div>
+                    </div>
                 </div>
             </div>
 

@@ -36,10 +36,34 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { settings: dataSettings, updateSettings: updateDataSettings } = useData();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // Initialize dark mode from localStorage or system preference
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Check localStorage first
+    const savedMode = localStorage.getItem('theme-mode');
+    if (savedMode !== null) {
+      return savedMode === 'dark';
+    }
+    // If no saved preference, check system preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
   // Use settings from data context, but fall back to default settings if not loaded yet
   const settings = dataSettings || DEFAULT_SETTINGS;
+
+  // Listen for system theme changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      // Only update if user hasn't set a preference
+      if (!localStorage.getItem('theme-mode')) {
+        setIsDarkMode(e.matches);
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const applyTheme = useCallback((themeSettings: CompanySettings, isDark: boolean) => {
     const theme = themeSettings.theme as unknown as ThemeColors;
@@ -152,7 +176,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
   
   const toggleDarkMode = () => {
-    setIsDarkMode(prev => !prev);
+    setIsDarkMode(prev => {
+      const newMode = !prev;
+      localStorage.setItem('theme-mode', newMode ? 'dark' : 'light');
+      return newMode;
+    });
   };
 
   const formatCurrency = useCallback((value: number) => {

@@ -325,6 +325,7 @@ const DriverDashboardScreen: React.FC = () => {
                                                         value={driverData?.coconutsCarried || 0}
                                                         onChange={(value) => updateDriverData({ coconutsCarried: value })}
                                                         className="w-full"
+                                                        disabled={!isShiftActive}
                                                     />
                                                 </div>
                                                 <div>
@@ -336,10 +337,11 @@ const DriverDashboardScreen: React.FC = () => {
                                                         value={driverData?.changeAmount || 0}
                                                         onChange={(value) => updateDriverData({ changeAmount: value })}
                                                         className="w-full"
+                                                        disabled={!isShiftActive}
                                                     />
                                                 </div>
                                             </div>
-                                            <Button 
+                                                                                            <Button 
                                                 onClick={async () => {
                                                     if (!driverDetails?.id) return;
                                                     try {
@@ -358,7 +360,7 @@ const DriverDashboardScreen: React.FC = () => {
                                                     }
                                                 }}
                                                 className="w-full"
-                                                disabled={isSaving}
+                                                disabled={isSaving || !isShiftActive}
                                             >
                                                 {isSaving ? 'Saving...' : 'Save Starting Values'}
                                             </Button>
@@ -407,8 +409,8 @@ const DriverDashboardScreen: React.FC = () => {
                                                             setSelectedLocationId(currentAssignment.id);
                                                         }
                                                     }}
-                                                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors duration-200 ${currentAssignment ? 'hover:bg-accent/10 active:bg-accent/20 cursor-pointer' : 'cursor-default'}`}
-                                                    disabled={!currentAssignment}
+                                                    className={`flex items-center gap-2 px-3 py-2 rounded-md transition-colors duration-200 ${currentAssignment && isShiftActive ? 'hover:bg-accent/10 active:bg-accent/20 cursor-pointer' : 'cursor-default opacity-50'}`}
+                                                    disabled={!currentAssignment || !isShiftActive}
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-accent flex-shrink-0">
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
