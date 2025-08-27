@@ -1,8 +1,27 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { CompanySettings, ThemeColors } from '../types';
-import { MOCK_SETTINGS } from '../lib/mockData';
 import { hexToHSL } from '../lib/utils';
 import { useData } from './DataContext';
+
+// Default settings moved from mockData.ts to here
+const DEFAULT_SETTINGS: CompanySettings = {
+    id: 'drivesell-settings',
+    name: "",
+    logoUrl: "https://tailwindui.com/img/logos/mark.svg?color=white",
+    faviconUrl: "https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500",
+    icon192Url: "https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500",
+    icon512Url: "https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500",
+    theme: {
+        primary: '#111827', // dark gray
+        secondary: '#f3f4f6', // light gray
+        foreground: '#1f2937', // text color
+        background: '#ffffff', // white
+    },
+    currency: 'IDR',
+    showDriverCommission: true,
+    showDriverItemsSold: true,
+    showDriverSchedule: true,
+};
 
 interface ThemeContextType {
   settings: CompanySettings;
@@ -19,8 +38,8 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const { settings: dataSettings, updateSettings: updateDataSettings } = useData();
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // Use settings from data context, but fall back to mock settings if not loaded yet
-  const settings = dataSettings || MOCK_SETTINGS;
+  // Use settings from data context, but fall back to default settings if not loaded yet
+  const settings = dataSettings || DEFAULT_SETTINGS;
 
   const applyTheme = useCallback((themeSettings: CompanySettings, isDark: boolean) => {
     const theme = themeSettings.theme as unknown as ThemeColors;
@@ -128,8 +147,8 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const resetSettings = () => {
-    const { id, ...mockDataWithoutId } = MOCK_SETTINGS;
-    updateDataSettings(mockDataWithoutId);
+    const { id, ...defaultDataWithoutId } = DEFAULT_SETTINGS;
+    updateDataSettings(defaultDataWithoutId);
   };
   
   const toggleDarkMode = () => {

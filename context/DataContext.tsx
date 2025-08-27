@@ -13,8 +13,27 @@ import {
 import { getLocalDateString, getStartOfDay, getEndOfDay } from '../lib/dateUtils';
 import { Database } from '../lib/database.types';
 import { supabase } from '../lib/supabaseClient';
-import { MOCK_SETTINGS } from '../lib/mockData';
 import { useAuth } from './AuthContext';
+
+// Default settings moved from mockData.ts
+const DEFAULT_SETTINGS: CompanySettings = {
+    id: 'drivesell-settings',
+    name: "",
+    logoUrl: "https://tailwindui.com/img/logos/mark.svg?color=white",
+    faviconUrl: "https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500",
+    icon192Url: "https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500",
+    icon512Url: "https://tailwindui.com/img/logos/mark.svg?color=indigo&shade=500",
+    theme: {
+        primary: '#111827', // dark gray
+        secondary: '#f3f4f6', // light gray
+        foreground: '#1f2937', // text color
+        background: '#ffffff', // white
+    },
+    currency: 'IDR',
+    showDriverCommission: true,
+    showDriverItemsSold: true,
+    showDriverSchedule: true,
+};
 import { 
   storeData, 
   addPendingAction, 
@@ -100,15 +119,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 await storeData('settings', settingsData);
             } else if (!settingsError) {
                 // Jika tidak ada settings, gunakan default
-                const defaultSettings = { ...MOCK_SETTINGS, id: crypto.randomUUID() };
+                const defaultSettings = { ...DEFAULT_SETTINGS, id: crypto.randomUUID() };
                 setSettings(defaultSettings);
                 await storeData('settings', defaultSettings);
             }
         }
     } catch (err) {
         console.error('Error loading settings:', err);
-        // Fallback ke mock settings
-        setSettings(MOCK_SETTINGS);
+        // Fallback to default settings
+        setSettings(DEFAULT_SETTINGS);
     }
 };
 
@@ -296,7 +315,7 @@ const loadFromIndexedDB = async () => {
         } else {
           // If no settings exist in DB, insert the default ones
           const { data: newSettings, error: insertError } = await supabase.from('settings')
-            .insert({ ...MOCK_SETTINGS, id: crypto.randomUUID() })
+            .insert({ ...DEFAULT_SETTINGS, id: crypto.randomUUID() })
             .select()
             .single();
           if (insertError) throw insertError;
@@ -329,9 +348,9 @@ const loadFromIndexedDB = async () => {
     } catch (err: any) {
         setError(err);
         console.error("Error fetching data:", err.message || err);
-        // Fallback to mock settings if the fetch fails, to prevent app crash
+        // Fallback to default settings if the fetch fails, to prevent app crash
         if (!settings) {
-            setSettings(MOCK_SETTINGS);
+            setSettings(DEFAULT_SETTINGS);
         }
     } finally {
         console.log("DataProvider: fetchAllData finished.");
