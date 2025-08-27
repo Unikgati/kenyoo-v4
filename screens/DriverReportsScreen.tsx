@@ -124,7 +124,8 @@ const DriverReportsScreen: React.FC = () => {
                 productSales.forEach(product => {
                     product.coconutsLeft = coconutsLeft;
                     // Deposit Amount = Total penjualan + Uang kembalian yang dibawa
-                    product.depositAmount = product.totalAmount + (dailySetup?.change_amount || 0);
+                    // Hanya menggunakan cash total untuk deposit
+                    product.depositAmount = product.cashTotal + (dailySetup?.change_amount || 0);
                 });
 
                 return productSales;
@@ -264,8 +265,10 @@ const DriverReportsScreen: React.FC = () => {
                                         const changeAmount = selectedSetup?.change_amount || 0;
                                         const coconutsSold = selectedDateSales.reduce((sum, sale) => sum + sale.quantity, 0);
                                         const coconutsLeft = coconutsCarried - coconutsSold;
-                                        const totalSales = selectedDateSales.reduce((sum, sale) => sum + sale.total, 0);
-                                        const depositAmount = totalSales + changeAmount;
+                                        // Hanya menghitung penjualan cash
+                                        const totalCashSales = selectedDateSales.reduce((sum, sale) => 
+                                            sale.paymentMethod === 'cash' ? sum + sale.total : sum, 0);
+                                        const depositAmount = totalCashSales + changeAmount;
 
                                         return (
                                             <div className="flex flex-wrap gap-2 text-sm">

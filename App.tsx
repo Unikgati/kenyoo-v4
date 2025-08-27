@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { DataProvider } from './context/DataContext';
@@ -13,6 +14,7 @@ import DriversScreen from './screens/DriversScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import DriverDashboardScreen from './screens/DriverDashboardScreen';
 import LocationsScreen from './screens/LocationsScreen';
+import LocationDashboardScreen from './screens/LocationDashboardScreen';
 import ScheduleScreen from './screens/ScheduleScreen';
 import PayrollScreen from './screens/PayrollScreen';
 import ReportsScreen from './screens/ReportsScreen';
@@ -21,27 +23,27 @@ import DriverReportsScreen from './screens/DriverReportsScreen';
 type AdminScreen = 'dashboard' | 'products' | 'drivers' | 'locations' | 'schedule' | 'payroll' | 'reports' | 'driver-reports' | 'settings';
 
 const AdminLayout: React.FC = () => {
-    const [activeScreen, setActiveScreen] = useState<AdminScreen>('dashboard');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
     
-    const handleSetActiveScreen = (screen: AdminScreen) => {
-        setActiveScreen(screen);
-        setIsSidebarOpen(false); // Close sidebar on navigation
+    const getActiveScreen = (path: string): AdminScreen => {
+        if (path.startsWith('/dashboard')) return 'dashboard';
+        if (path.startsWith('/products')) return 'products';
+        if (path.startsWith('/drivers')) return 'drivers';
+        if (path.startsWith('/locations')) return 'locations';
+        if (path.startsWith('/schedule')) return 'schedule';
+        if (path.startsWith('/payroll')) return 'payroll';
+        if (path.startsWith('/reports')) return 'reports';
+        if (path.startsWith('/driver-reports')) return 'driver-reports';
+        if (path.startsWith('/settings')) return 'settings';
+        return 'dashboard';
     };
 
-    const renderScreen = () => {
-        switch (activeScreen) {
-            case 'dashboard': return <DashboardScreen />;
-            case 'products': return <ProductsScreen />;
-            case 'drivers': return <DriversScreen />;
-            case 'locations': return <LocationsScreen />;
-            case 'schedule': return <ScheduleScreen />;
-            case 'payroll': return <PayrollScreen />;
-            case 'reports': return <ReportsScreen />;
-            case 'driver-reports': return <DriverReportsScreen />;
-            case 'settings': return <SettingsScreen />;
-            default: return <DashboardScreen />;
-        }
+    const handleSetActiveScreen = (screen: AdminScreen) => {
+        const path = '/' + screen.toLowerCase();
+        navigate(path);
+        setIsSidebarOpen(false);
     };
 
     return (
@@ -54,14 +56,26 @@ const AdminLayout: React.FC = () => {
               />
             )}
             <Sidebar 
-                activeScreen={activeScreen} 
+                activeScreen={getActiveScreen(location.pathname)} 
                 setActiveScreen={handleSetActiveScreen}
                 isSidebarOpen={isSidebarOpen} 
             />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-secondary/50 p-6">
-                    {renderScreen()}
+                        <Routes>
+                        <Route path="/" element={<DashboardScreen />} />
+                        <Route path="/dashboard" element={<DashboardScreen />} />
+                        <Route path="/products" element={<ProductsScreen />} />
+                        <Route path="/drivers" element={<DriversScreen />} />
+                        <Route path="/locations" element={<LocationsScreen />} />
+                        <Route path="/locations/:locationId" element={<LocationDashboardScreen />} />
+                        <Route path="/schedule" element={<ScheduleScreen />} />
+                        <Route path="/payroll" element={<PayrollScreen />} />
+                        <Route path="/reports" element={<ReportsScreen />} />
+                        <Route path="/driver-reports" element={<DriverReportsScreen />} />
+                        <Route path="/settings" element={<SettingsScreen />} />
+                    </Routes>
                 </main>
             </div>
         </div>
@@ -116,13 +130,15 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-        <DataProvider>
-            <ThemeProvider>
-                <AppContent />
-            </ThemeProvider>
-        </DataProvider>
-    </AuthProvider>
+    <BrowserRouter>
+        <AuthProvider>
+            <DataProvider>
+                <ThemeProvider>
+                    <AppContent />
+                </ThemeProvider>
+            </DataProvider>
+        </AuthProvider>
+    </BrowserRouter>
   );
 };
 
