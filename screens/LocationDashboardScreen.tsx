@@ -1,4 +1,4 @@
-    import React, { useMemo } from 'react';
+    import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { useTheme } from '../context/ThemeContext';
@@ -7,47 +7,133 @@ import Button from '../components/ui/Button';
 import { Sale } from '../types';
 import PeakHoursChart from '../components/PeakHoursChart';
 
+interface HourlyData {
+    hour: string;
+    sales: number;
+    transactions: number;
+}
+
+interface DailyHourlyStats {
+    date: string;
+    formattedDate: string;
+    hourlyData: HourlyData[];
+    total: number;
+}
+
+interface DriverStats {
+    driverId: string;
+    driverName: string;
+    totalSales: number;
+    transactions: number;
+}
+
+interface ProductStats {
+    name: string;
+    quantity: number;
+}
+
+interface DailyProductStats {
+    date: string;
+    formattedDate: string;
+    products: ProductStats[];
+    total: number;
+}
+
+interface PeakActivityData {
+    peakHours: Array<{ hour: number; count: number }>;
+    peakDays: Array<{ day: string; count: number }>;
+}
+
 const LocationDashboardScreen: React.FC = () => {
     const { locationId } = useParams();
     const navigate = useNavigate();
-    const { sales, locations, drivers } = useData();
+    const { sales, locations, drivers, loading, error } = useData();
     const { formatCurrency } = useTheme();
+    
+    // State for view modes
+    const [productsViewMode, setProductsViewMode] = useState<'all' | 'daily'>('all');
+    const [hourlyViewMode, setHourlyViewMode] = useState<'all' | 'daily'>('all');
+    const [currentProductDayIndex, setCurrentProductDayIndex] = useState(0);
+    const [currentHourlyDayIndex, setCurrentHourlyDayIndex] = useState(0);
 
-    const location = locations.find(loc => loc.id === locationId);
-    if (!location) {
-        return (
-            <div className="p-6">
-                <div className="text-center">Location not found</div>
-                <Button onClick={() => navigate('/locations')} className="mt-4">
-                    Back to Locations
-                </Button>
-            </div>
-        );
-    }
-
-    // Filter sales for this location
+    // Move location finding to useMemo to keep it consistent
+    const location = useMemo(() => locations.find(loc => loc.id === locationId), [locations, locationId]);
+    
+    // Pre-calculate locationSales even if we might not use it
     const locationSales = useMemo(() => {
+        if (!location) return [];
         return sales.filter(sale => sale.location === location.name);
     }, [sales, location]);
 
     // 1. Hourly Sales Distribution
-    const hourlySales = useMemo(() => {
-        const hourlyData = Array.from({ length: 24 }, (_, hour) => ({
+    const { allHourlySales, dailyHourlySales } = useMemo(() => {
+        if (!location) return { allHourlySales: [], dailyHourlySales: [] };
+
+        // Calculate overall hourly data
+        const overallHourlyData = Array.from({ length: 24 }, (_, hour) => ({
             hour: hour.toString().padStart(2, '0') + ':00',
             sales: 0,
             transactions: 0
         }));
 
-    locationSales.forEach(sale => {
-        const hour = new Date(sale.timestamp).getHours();
-        hourlyData[hour].sales += 1;  // Menggunakan jumlah transaksi, bukan total penjualan
-        hourlyData[hour].transactions += 1;
-    });        return hourlyData;
-    }, [locationSales]);
+        // Group sales by date for daily view
+        const dailySalesMap = new Map<string, HourlyData[]>();
+
+        locationSales.forEach(sale => {
+            const saleDate = new Date(sale.timestamp);
+            const hour = saleDate.getHours();
+            
+            // Update overall data
+            overallHourlyData[hour].sales += 1;
+            overallHourlyData[hour].transactions += 1;
+            
+            // Update daily data
+            const dateKey = saleDate.toISOString().split('T')[0];
+            const formattedDate = saleDate.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            if (!dailySalesMap.has(dateKey)) {
+                dailySalesMap.set(dateKey, Array.from({ length: 24 }, (_, h) => ({
+                    hour: h.toString().padStart(2, '0') + ':00',
+                    sales: 0,
+                    transactions: 0
+                })));
+            }
+            
+            const dailyData = dailySalesMap.get(dateKey)!;
+            dailyData[hour].sales += 1;
+            dailyData[hour].transactions += 1;
+        });
+
+        // Convert daily map to array and sort by date
+        const dailyStats: DailyHourlyStats[] = Array.from(dailySalesMap.entries())
+            .map(([date, hourlyData]) => ({
+                date,
+                formattedDate: new Date(date).toLocaleDateString('id-ID', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                hourlyData,
+                total: hourlyData.reduce((sum, hour) => sum + hour.transactions, 0)
+            }))
+            .sort((a, b) => b.date.localeCompare(a.date));
+
+        return {
+            allHourlySales: overallHourlyData,
+            dailyHourlySales: dailyStats
+        };
+    }, [locationSales, location]);
 
     // 2. Top Performing Drivers
-    const topDrivers = useMemo(() => {
-        const driverStats = new Map();
+    const topDrivers = useMemo<DriverStats[]>(() => {
+        if (!location) return [];
+        const driverStats = new Map<string, DriverStats>();
 
         locationSales.forEach(sale => {
             const existing = driverStats.get(sale.driverId) || {
@@ -66,57 +152,165 @@ const LocationDashboardScreen: React.FC = () => {
         return Array.from(driverStats.values())
             .sort((a, b) => b.totalSales - a.totalSales)
             .slice(0, 5);
-    }, [locationSales]);
+    }, [locationSales, location]);
 
     // Top Products Analysis
-    const topProducts = useMemo(() => {
-        const productSales: Record<string, { name: string; quantity: number }> = {};
+    const { topProducts, dailyProducts } = useMemo(() => {
+        if (!location) return { topProducts: [], dailyProducts: [] };
+        
+        // Calculate overall top products
+        const productSales: Record<string, ProductStats> = {};
+        const dailySalesMap = new Map<string, Record<string, ProductStats>>();
+        
         locationSales.forEach(sale => {
+            // Overall products
             if (!productSales[sale.productId]) {
                 productSales[sale.productId] = { name: sale.productName, quantity: 0 };
             }
             productSales[sale.productId].quantity += sale.quantity;
+            
+            // Daily products
+            const date = new Date(sale.timestamp);
+            const dateKey = date.toISOString().split('T')[0];
+            if (!dailySalesMap.has(dateKey)) {
+                dailySalesMap.set(dateKey, {});
+            }
+            
+            const dailyProducts = dailySalesMap.get(dateKey)!;
+            if (!dailyProducts[sale.productId]) {
+                dailyProducts[sale.productId] = { name: sale.productName, quantity: 0 };
+            }
+            dailyProducts[sale.productId].quantity += sale.quantity;
         });
-        return Object.values(productSales)
-            .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 5);
-    }, [locationSales]);
+
+        // Process daily sales
+        const dailyProductStats: DailyProductStats[] = Array.from(dailySalesMap.entries())
+            .map(([date, products]) => {
+                const productList = Object.values(products)
+                    .sort((a, b) => b.quantity - a.quantity)
+                    .slice(0, 5);
+                
+                const total = productList.reduce((sum, product) => sum + product.quantity, 0);
+                const dateObj = new Date(date);
+                
+                return {
+                    date,
+                    formattedDate: dateObj.toLocaleDateString('id-ID', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    }),
+                    products: productList,
+                    total
+                };
+            })
+            .sort((a, b) => b.date.localeCompare(a.date));
+
+        return {
+            topProducts: Object.values(productSales)
+                .sort((a, b) => b.quantity - a.quantity)
+                .slice(0, 5),
+            dailyProducts: dailyProductStats
+        };
+    }, [locationSales, location]);
 
     // 3. Peak Activity Analysis
-    const peakActivity = useMemo(() => {
+    const peakActivity = useMemo<PeakActivityData>(() => {
+        if (!location) return { peakHours: [], peakDays: [] };
+        
         const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const hourlyTransactions = Array(24).fill(0);
         const daySales: Record<string, number> = {};
         
         locationSales.forEach(sale => {
-            // Count hourly transactions
             const saleDate = new Date(sale.timestamp);
             const hour = saleDate.getHours();
             hourlyTransactions[hour]++;
             
-            // Count daily transactions
             const dayName = WEEKDAYS[saleDate.getDay()];
             daySales[dayName] = (daySales[dayName] || 0) + 1;
         });
 
-        // Calculate averages
         const hourlyAverage = hourlyTransactions.reduce((a, b) => a + b, 0) / 24;
         const dailyAverage = Object.values(daySales).reduce((a, b) => a + b, 0) / 7;
 
-        // Find peak hours
         const peakHours = hourlyTransactions
             .map((count, hour) => ({ hour, count }))
             .filter(({ count }) => count > hourlyAverage)
             .sort((a, b) => b.count - a.count);
 
-        // Find peak days
         const peakDays = Object.entries(daySales)
             .filter(([, count]) => count > dailyAverage)
             .sort(([, a], [, b]) => b - a)
             .map(([day, count]) => ({ day, count }));
 
         return { peakHours, peakDays };
-    }, [locationSales]);
+    }, [locationSales, location]);
+
+    // Handle loading state
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="space-y-4 text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                    <p className="text-sm text-muted-foreground">Loading location data...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Handle error state
+    if (error) {
+        return (
+            <div className="p-6">
+                <div className="max-w-xl mx-auto bg-red-50 dark:bg-red-900/10 rounded-lg p-4">
+                    <div className="text-center space-y-3">
+                        <p className="text-red-600 dark:text-red-400">Error loading location data</p>
+                        <p className="text-sm text-red-500/70 dark:text-red-400/70">{error.message}</p>
+                        <Button 
+                            onClick={() => navigate('/locations')}
+                            variant="ghost"
+                            className="mt-2"
+                        >
+                            Back to Locations
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Make sure we have locations data
+    if (!locations || locations.length === 0) {
+        return (
+            <div className="p-6">
+                <div className="text-center">
+                    <p className="text-muted-foreground">No locations available</p>
+                    <Button onClick={() => navigate('/locations')} className="mt-4">
+                        Back to Locations List
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    // Check if location exists
+    if (!location) {
+        return (
+            <div className="p-6">
+                <div className="text-center space-y-2">
+                    <p className="text-muted-foreground">Location not found</p>
+                    <p className="text-sm text-muted-foreground/70">The location you're looking for doesn't exist or has been removed.</p>
+                    <Button onClick={() => navigate('/locations')} className="mt-4">
+                        Back to Locations
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+
 
     return (
         <div className="space-y-6 p-6">
@@ -140,32 +334,167 @@ const LocationDashboardScreen: React.FC = () => {
 
             {/* Top Products */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Top Products</CardTitle>
+                <CardHeader className="space-y-0 pb-4">
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Top Products</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant={productsViewMode === 'all' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setProductsViewMode('all')}
+                                className="h-8"
+                            >
+                                Overall
+                            </Button>
+                            <Button
+                                variant={productsViewMode === 'daily' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => {
+                                    setProductsViewMode('daily');
+                                    setCurrentProductDayIndex(0);
+                                }}
+                                className="h-8"
+                            >
+                                Daily
+                            </Button>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    {topProducts.length > 0 ? (
-                        <ul className="space-y-3">
-                            {topProducts.map((product) => (
-                                <li key={product.name} className="flex justify-between text-sm">
-                                    <span>{product.name}</span>
-                                    <span className="font-semibold">{product.quantity} sold</span>
-                                </li>
-                            ))}
-                        </ul>
+                    {productsViewMode === 'all' ? (
+                        topProducts.length > 0 ? (
+                            <ul className="space-y-3">
+                                {topProducts.map((product) => (
+                                    <li key={product.name} className="flex items-center justify-between text-sm bg-secondary/20 rounded-md p-3">
+                                        <span className="font-medium">{product.name}</span>
+                                        <span className="font-semibold">{product.quantity} sold</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-center text-sm text-foreground/60 py-4">No sales data available yet.</p>
+                        )
+                    ) : dailyProducts.length > 0 ? (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setCurrentProductDayIndex(Math.min(currentProductDayIndex + 1, dailyProducts.length - 1))}
+                                    disabled={currentProductDayIndex >= dailyProducts.length - 1}
+                                    className="h-8 w-8"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                        <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                    </svg>
+                                </Button>
+                                <p className="text-sm font-medium">{dailyProducts[currentProductDayIndex]?.formattedDate}</p>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setCurrentProductDayIndex(Math.max(currentProductDayIndex - 1, 0))}
+                                    disabled={currentProductDayIndex <= 0}
+                                    className="h-8 w-8"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                        <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                    </svg>
+                                </Button>
+                            </div>
+                            <ul className="space-y-2">
+                                {dailyProducts[currentProductDayIndex]?.products.map((product) => (
+                                    <li key={product.name} className="flex items-center justify-between text-sm bg-secondary/20 rounded-md p-3">
+                                        <span className="font-medium">{product.name}</span>
+                                        <span className="font-semibold">{product.quantity} sold</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="pt-2 border-t">
+                                <p className="text-sm text-foreground/70 flex items-center justify-between">
+                                    <span>Total Sales</span>
+                                    <span className="font-semibold">{dailyProducts[currentProductDayIndex]?.total || 0} items</span>
+                                </p>
+                            </div>
+                        </div>
                     ) : (
-                        <p className="text-center text-sm text-foreground/60 py-4">No sales data available yet.</p>
+                        <p className="text-center text-sm text-foreground/60 py-4">No daily sales data available.</p>
                     )}
                 </CardContent>
             </Card>
 
             {/* 1. Hourly Sales Distribution */}
             <Card>
-                <CardHeader>
-                    <CardTitle>Hourly Sales Distribution</CardTitle>
+                <CardHeader className="space-y-0 pb-4">
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Hourly Sales Distribution</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant={hourlyViewMode === 'all' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setHourlyViewMode('all')}
+                                className="h-8"
+                            >
+                                Overall
+                            </Button>
+                            <Button
+                                variant={hourlyViewMode === 'daily' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => {
+                                    setHourlyViewMode('daily');
+                                    setCurrentHourlyDayIndex(0);
+                                }}
+                                className="h-8"
+                            >
+                                Daily
+                            </Button>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <PeakHoursChart data={hourlySales} />
+                    {hourlyViewMode === 'daily' && dailyHourlySales.length > 0 && (
+                        <div className="flex items-center justify-between mb-4">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setCurrentHourlyDayIndex(Math.max(currentHourlyDayIndex - 1, 0))}
+                                disabled={currentHourlyDayIndex <= 0}
+                                className="h-8 w-8"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                    <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                                </svg>
+                            </Button>
+                            <p className="text-sm font-medium">
+                                {dailyHourlySales[currentHourlyDayIndex]?.formattedDate}
+                            </p>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setCurrentHourlyDayIndex(Math.min(currentHourlyDayIndex + 1, dailyHourlySales.length - 1))}
+                                disabled={currentHourlyDayIndex >= dailyHourlySales.length - 1}
+                                className="h-8 w-8"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                                </svg>
+                            </Button>
+                        </div>
+                    )}
+                    {hourlyViewMode === 'all' ? (
+                        <PeakHoursChart data={allHourlySales} />
+                    ) : dailyHourlySales.length > 0 ? (
+                        <>
+                            <PeakHoursChart data={dailyHourlySales[currentHourlyDayIndex]?.hourlyData || []} />
+                            <div className="mt-4 pt-4 border-t">
+                                <p className="text-sm text-foreground/70 flex items-center justify-between">
+                                    <span>Total Transactions</span>
+                                    <span className="font-semibold">{dailyHourlySales[currentHourlyDayIndex]?.total || 0}</span>
+                                </p>
+                            </div>
+                        </>
+                    ) : (
+                        <p className="text-center text-sm text-foreground/60 py-4">No hourly data available.</p>
+                    )}
                 </CardContent>
             </Card>
 
