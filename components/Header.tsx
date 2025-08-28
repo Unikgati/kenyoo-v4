@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                     </button>
                 )}
                 <div className="flex items-center gap-3">
-                    {user?.role !== 'admin' && <AvatarProfile name={user?.name || 'User'} size="sm" showInfo={false} />}
+                    <AvatarProfile name={user?.name || 'User'} size="sm" showInfo={false} />
                     <div>
                         <div className="font-semibold text-sm sm:text-base truncate" title={user?.name}>{user?.name}</div>
                         <div className="text-xs sm:text-sm text-foreground/70 capitalize">{user?.role}</div>
